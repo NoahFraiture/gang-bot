@@ -115,7 +115,7 @@ async function tell(prompt) {
         temperature: 0,
         max_tokens: 7,
     });
-    return response.data.choices[0].text.trim();
+    return response;
 }
 
 function handleMessage(message, api) {
@@ -174,7 +174,12 @@ function handleMessage(message, api) {
             console.log("Polls list printed");
         }
     } else if (message.body.startsWith("tell")) {
-
+        console.log("Requesting GPT3");
+        var response = tell(message.body.split(" ", 2)[1]);
+        console.log("Statut %i + '%s'", response.status, response.statusText);
+        // todo : handle error status
+        api.sendMessage(response.data.choice[0].text.trim());
+        console.log("Response send");
     } else if (message.body == "ping") {
         api.sendMessage("pong", message.threadID);
         console.log("Ping Pong operation !");
