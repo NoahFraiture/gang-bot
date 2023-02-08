@@ -8,12 +8,15 @@ const credential = {
 };
 
 const { Configuration, OpenAIApi } = require("openai");
-const configuration = new Configuration({apiKey: "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",}); // todo : hide
+const configuration = new Configuration({
+    apiKey: "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",
+}); // todo : hide
 const openai = new OpenAIApi(configuration);
 
 const emojis = ["👍", "😠", "😢", "😮", "😆", "❤"];
 const LIMIT_POLLS = 8;
 var polls = [];
+const jsonName = "opeanai-logs.json";
 
 /*
 contains name, options bound to an emoji and counter for emoji, even with no option but doesn't print them
@@ -101,23 +104,58 @@ function pollList() {
 // start workers and sendMessage when reach date at the same time of the day of the command
 function reminder(message, api) {
     var worker = new Worker("./worker.js");
-    var mesCore = message.body.split(" ", 2)[1];
+    var mesCore = message.body.substr(message.body.indexOf(" ") + 1);
     worker.onmessage = (e) => {
         api.sendMessage("Ding dong " + mesCore, message.threadID);
     };
     worker.postMessage(mesCore);
 }
 
-async function tell(prompt) {
-    const response = await openai.createCompletion({
-        model: "text-ada-001",	// "text-davinci-003",
-        prompt: prompt,
-        temperature: 0,
-        max_tokens: 7,
-    });
-    return response;
+async function tell(message, api) {
+    var text = message.body.substr(message.body.indexOf(" ") + 1);
+    try {
+        const response = await openai.createCompletion({
+            model: "text-davinci-003", // "text-davinci-003",
+            prompt: text,
+            temperature: 0,
+            max_tokens: 7,
+        });
+        console.log("Statut %i + '%s'", response.status, response.statusText);
+        // todo : handle error status 
+        writeGPT({
+            "headers":response.headers, 
+            "status":response.status,
+            "config":response.config,
+            //"request":response.request, //got error here, but not necessary so is ok
+            "data":response.data
+        });
+        api.sendMessage(response.data.choices[0].text.trim(), message.threadID);
+        console.log("Response send");
+    } catch (e) {
+        console.log(e);
+        api.sendMessage("Error in generation of a response", message.threadID);
+    }
 }
 
+// write in json file, content = dictionnary
+function writeGPT(content) {
+    fs.readFile(jsonName, "utf8", function readFileCallback(err, data) {
+        if (err) {
+            console.log(err);
+        } else {
+            obj = JSON.parse(data); //now it an object
+            obj.gpt.push(content); //add some data
+            json = JSON.stringify(obj); //convert it back to json
+            fs.writeFile(jsonName, json, (e) => {
+                if (e) throw e;
+                console.log("Data written");
+            }); // write it back
+        }
+    });
+}
+
+// use third-party function to compute the data
+// handle facebook-api and console.log here when possible
 function handleMessage(message, api) {
     if (message.body == undefined) return;
     console.log(
@@ -175,11 +213,10 @@ function handleMessage(message, api) {
         }
     } else if (message.body.startsWith("tell")) {
         console.log("Requesting GPT3");
-        var response = tell(message.body.split(" ", 2)[1]);
-        console.log("Statut %i + '%s'", response.status, response.statusText);
-        // todo : handle error status
-        api.sendMessage(response.data.choice[0].text.trim());
-        console.log("Response send");
+        tell(message, api); // asynchronous so need to handle everything in the function
+    } else if (message.body.startsWith("save")) {
+        console.log("saving");
+        writeGPT({ test: "text" });
     } else if (message.body == "ping") {
         api.sendMessage("pong", message.threadID);
         console.log("Ping Pong operation !");
@@ -193,7 +230,7 @@ function handleMessage(message, api) {
     }
 }
 
-function handleReaction(message_reaction, api) {
+function handleReaction(message_reaction) {
     console.log(
         "%i a reagit avec : %s",
         message_reaction.userID,
@@ -212,15 +249,16 @@ login(credential, (err, api) => {
     api.listenMqtt((err, message) => {
         if (err) return console.log(err);
         if (message.type == "message") handleMessage(message, api);
-        if (message.type == "message_reaction") handleReaction(message, api);
+        if (message.type == "message_reaction") handleReaction(message);
     });
 });
 
-// todo : remindme. C script that send signal to js though file/messenger/deeper in api
 // todo : stay in node when execute file for noah-bot
-// each reception of "remind" command, create worker who wait until date before send message with api or to listener ?
 
-// est ce qu'on reste bloqué sur le listener ? on dirait que non
+// use asynchron function for worker ? how does it work ?
 
-// if (mes = remind) new Worker(); send(date); addlistener(sendMessage)
-// Worker : wait until date : post;
+// todo : tester le reminder et ajouter des options de parse
+// todo : getpoll repond au poll
+// todo : dall-e, options pour gpt
+// todo : quote me
+// todo : save gpt logs
