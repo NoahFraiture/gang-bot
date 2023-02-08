@@ -1,7 +1,8 @@
 const login = require("facebook-chat-api");
 const fs = require("fs");
+const got = require("got") // to scrap image from url
 const { exit } = require("process");
-const { Worker } = require("worker_threads");
+const { Worker } = require("worker_threads"); // multi threading
 
 const credential = {
     appState: JSON.parse(fs.readFileSync("appState.json", "utf-8")),
@@ -117,7 +118,7 @@ async function tell(message, api) {
         const response = await openai.createCompletion({
             model: "text-davinci-003", // "text-davinci-003",
             prompt: text,
-            temperature: 0,
+            temperature: 0.6,
             max_tokens: 7,
         });
         console.log("Statut %i + '%s'", response.status, response.statusText);
@@ -130,10 +131,40 @@ async function tell(message, api) {
             "data":response.data
         });
         api.sendMessage(response.data.choices[0].text.trim(), message.threadID);
-        console.log("Response send");
+        console.log("Response sent");
     } catch (e) {
         console.log(e);
         api.sendMessage("Error in generation of a response", message.threadID);
+    }
+}
+
+async function imagine(message, api) {
+    var text = message.body.substr(message.body.indexOf(" ") + 1);
+    try {
+        const response = await openai.createImage({
+            prompt: text,
+            n:1,
+            size:"256x256"
+        });
+        console.log("Statut %i + '%s'", response.status, response.statusText);
+        writeGPT({
+            "headers":response.headers, 
+            "status":response.status,
+            "config":response.config,
+            //"request":response.request, //got error here, but not necessary so is ok
+            "data":response.data
+        });
+        url = response.data.data[0].url;
+        await got.stream(url).pipe(fs.createWriteStream('image.png'));
+        var answer = {
+            body:text,
+            attachment: fs.createReadStream(__dirname + '/image.png')
+        }
+        api.sendMessage(answer, message.threadID);
+        console.log("Image sent")
+    } catch (e) {
+        console.log(e);
+        api.sendMessage("Error in generation of an image", message.threadID);
     }
 }
 
@@ -214,9 +245,9 @@ function handleMessage(message, api) {
     } else if (message.body.startsWith("tell")) {
         console.log("Requesting GPT3");
         tell(message, api); // asynchronous so need to handle everything in the function
-    } else if (message.body.startsWith("save")) {
-        console.log("saving");
-        writeGPT({ test: "text" });
+    } else if (message.body.startsWith("imagine")) {
+        console.log("Generating image")
+        imagine(message, api);
     } else if (message.body == "ping") {
         api.sendMessage("pong", message.threadID);
         console.log("Ping Pong operation !");
@@ -261,4 +292,3 @@ login(credential, (err, api) => {
 // todo : getpoll repond au poll
 // todo : dall-e, options pour gpt
 // todo : quote me
-// todo : save gpt logs
