@@ -25,7 +25,7 @@ Can be changed easily (print function)
 */
 class Poll {
     constructor(messageID, name, options) {
-        this.name = name;
+        this.name = name.trim();
         this.messageID = messageID;
         this.userReaction = [];
         this.list = [];
@@ -227,7 +227,7 @@ function handleMessage(message, api) {
     } else if (message.body.startsWith("getpoll ")) {
         console.log("Searching poll");
         var name = message.body.slice("getpoll".length + 1);
-        var pollText = searchPoll(name); // get Poll.print() or 0 if not found
+        var pollText = searchPoll(name.trim()); // get Poll.print() or 0 if not found
         if (pollText) {
             api.sendMessage(pollText, message.threadID);
             console.log('Poll "%s" shown', name);
