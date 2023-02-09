@@ -1,8 +1,31 @@
 const login = require("facebook-chat-api");
 const fs = require("fs");
-const got = require("got") // to scrap image from url
+const got = require("got"); // to scrap image from url
 const { exit } = require("process");
 const { Worker } = require("worker_threads"); // multi threading
+
+const pollsName = "pollSaved.json";
+//process.stdin.resume();
+process.on('SIGINT', () => {
+    console.log("Shut down, exiting");
+    fs.readFile(pollsName, "utf8", function readFileCallback(err, data) {
+        console.log("test"); // ne parvient pas ici
+        if (err) {
+            console.log(err);
+        } else {
+            obj = JSON.parse(data);
+            obj.poll = polls.map( (poll) => poll.serialize );
+            json = JSON.stringify(obj);
+            fs.writeFile(pollsName, json, (e) => {
+                if (e) throw e;
+                console.log("Data written");
+            }); // write it back
+            console.log("Polls saved");
+            console.log(obj);
+        }
+    });
+    exit(1);
+});
 
 const credential = {
     appState: JSON.parse(fs.readFileSync("appState.json", "utf-8")),
@@ -25,15 +48,15 @@ Can be changed easily (print function)
 */
 class Poll {
     constructor(messageID, name, options) {
-        this.name = name.trim();
+        this.name = name;
         this.messageID = messageID;
         this.userReaction = [];
-        this.list = [];
+        this.state = [];
         this.size = options.length;
         for (let i = 0; i < this.size; i++) {
-            this.list.push([options[i], emojis[i], 0]); // option, emoji, nb of vote
+            this.state.push([options[i], emojis[i], 0]); // option, emoji, nb of vote
         }
-        console.log(this.list);
+        console.log(this.state);
     }
 
     add(emoji, user) {
@@ -49,18 +72,18 @@ class Poll {
             this.userReaction.push([user, emoji]);
         }
         for (let i = 0; i < this.size; i++) {
-            if (this.list[i][1] == emoji) {
-                this.list[i][2]++;
+            if (this.state[i][1] == emoji) {
+                this.state[i][2]++;
                 console.log("Add %s from %i", emoji, user);
-            } else if (this.list[i][1] == toRemove) {
-                this.list[i][2]--;
+            } else if (this.state[i][1] == toRemove) {
+                this.state[i][2]--;
             }
         }
     }
 
     print() {
         var response = this.name + "\n";
-        this.list.forEach((element) => {
+        this.state.forEach((element) => {
             response =
                 response +
                 element[0] +
@@ -72,13 +95,32 @@ class Poll {
         });
         return response;
     }
+
+    serialize() {
+        // save in file + need init file to load polls, reminder etc
+        json = JSON.stringify({
+            "messageID":this.messageID,
+            "name":this.name,
+            "state":this.state,
+            "userReaction":this.userReaction
+        });
+        return json;
+    }
+}
+
+function deserialize(dict) {
+    var p = new Poll(null, null, null);
+    p.messageID = dict.messageID;
+    p.name = dict.name;
+    p.state = dict.state;
+    p.userReaction = dict.userReaction;
 }
 
 // return message representing the poll named. 0 otherwised
 function searchPoll(name) {
     for (let i = 0; i < polls.length; i++) {
         if (polls[i].name == name) {
-            return polls[i].print();
+            return polls[i];
         }
     }
     return 0;
@@ -122,13 +164,13 @@ async function tell(message, api) {
             max_tokens: 7,
         });
         console.log("Statut %i + '%s'", response.status, response.statusText);
-        // todo : handle error status 
+        // todo : handle error status
         writeGPT({
-            "headers":response.headers, 
-            "status":response.status,
-            "config":response.config,
+            headers: response.headers,
+            status: response.status,
+            config: response.config,
             //"request":response.request, //got error here, but not necessary so is ok
-            "data":response.data
+            data: response.data,
         });
         api.sendMessage(response.data.choices[0].text.trim(), message.threadID);
         console.log("Response sent");
@@ -143,25 +185,25 @@ async function imagine(message, api) {
     try {
         const response = await openai.createImage({
             prompt: text,
-            n:1,
-            size:"256x256"
+            n: 1,
+            size: "256x256",
         });
         console.log("Statut %i + '%s'", response.status, response.statusText);
         writeGPT({
-            "headers":response.headers, 
-            "status":response.status,
-            "config":response.config,
+            headers: response.headers,
+            status: response.status,
+            config: response.config,
             //"request":response.request, //got error here, but not necessary so is ok
-            "data":response.data
+            data: response.data,
         });
         url = response.data.data[0].url;
-        await got.stream(url).pipe(fs.createWriteStream('image.png'));
+        await got.stream(url).pipe(fs.createWriteStream("image.png"));
         var answer = {
-            body:text,
-            attachment: fs.createReadStream(__dirname + '/image.png')
-        }
+            body: text,
+            attachment: fs.createReadStream(__dirname + "/image.png"),
+        };
         api.sendMessage(answer, message.threadID);
-        console.log("Image sent")
+        console.log("Image sent");
     } catch (e) {
         console.log(e);
         api.sendMessage("Error in generation of an image", message.threadID);
@@ -169,7 +211,7 @@ async function imagine(message, api) {
 }
 
 // write in json file, content = dictionnary
-function writeGPT(content) {
+function writeGPTLogs(content) {
     fs.readFile(jsonName, "utf8", function readFileCallback(err, data) {
         if (err) {
             console.log(err);
@@ -187,6 +229,7 @@ function writeGPT(content) {
 
 // use third-party function to compute the data
 // handle facebook-api and console.log here when possible
+// return error message when problem. Main function handle it
 function handleMessage(message, api) {
     if (message.body == undefined) return;
     console.log(
@@ -207,6 +250,13 @@ function handleMessage(message, api) {
 
         // create message of poll
         var pollMessage = createPollInfos(message.body); // name-str ; options-list(str)
+        if (searchPoll(pollMessage[0].trim()) != 0) {
+            api.sendMessage(
+                "A poll with this name already exists",
+                message.threadID
+            );
+            console.log("A poll with this name already exists");
+        }
         var mes = pollMessage[0] + "\n";
         for (let i = 0; i < pollMessage[1].length; i++) {
             mes = mes + pollMessage[1][i] + " " + emojis[i] + "\n";
@@ -214,11 +264,14 @@ function handleMessage(message, api) {
 
         // send message and get his id to create a Poll()
         api.sendMessage(mes, message.threadID, (err, sentMessageInfo) => {
-            if (err) return console.error(err);
+            if (err) {
+                console.error(err);
+                return err;
+            }
             polls.push(
                 new Poll(
                     sentMessageInfo.messageID,
-                    pollMessage[0],
+                    pollMessage[0].trim(),
                     pollMessage[1]
                 )
             );
@@ -227,9 +280,10 @@ function handleMessage(message, api) {
     } else if (message.body.startsWith("getpoll ")) {
         console.log("Searching poll");
         var name = message.body.slice("getpoll".length + 1);
-        var pollText = searchPoll(name.trim()); // get Poll.print() or 0 if not found
+        var myPoll = searchPoll(name.trim());
+        var pollText = myPoll.print();
         if (pollText) {
-            api.sendMessage(pollText, message.threadID);
+            api.sendMessage(pollText, message.threadID, myPoll.messageID);
             console.log('Poll "%s" shown', name);
         } else {
             console.log('Error : Poll "%s" not found', name);
@@ -246,7 +300,7 @@ function handleMessage(message, api) {
         console.log("Requesting GPT3");
         tell(message, api); // asynchronous so need to handle everything in the function
     } else if (message.body.startsWith("imagine")) {
-        console.log("Generating image")
+        console.log("Generating image");
         imagine(message, api);
     } else if (message.body == "ping") {
         api.sendMessage("pong", message.threadID);
@@ -274,6 +328,22 @@ function handleReaction(message_reaction) {
     }
 }
 
+function init() {
+    fs.readFile(pollsName, "utf8", function readFileCallback(err, data) {
+        if (err) {
+            console.log(err);
+            exit(-1);
+        }
+        obj = JSON.parse(data);
+        polls = obj.poll.map((poll) => {
+            deserialize(poll);
+            return poll;
+        });
+    })
+}
+
+init();
+
 login(credential, (err, api) => {
     if (err) return console.error(err);
     api.setOptions({ listenEvents: true });
@@ -289,6 +359,7 @@ login(credential, (err, api) => {
 // use asynchron function for worker ? how does it work ?
 
 // todo : tester le reminder et ajouter des options de parse
-// todo : getpoll repond au poll
 // todo : dall-e, options pour gpt
 // todo : quote me
+// todo : handle error
+// todo : régler le problème de sigint
