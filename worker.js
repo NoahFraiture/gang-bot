@@ -2,7 +2,8 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-onmessage = (e) => {
+onmessage = function(e) {
+    console.log(e);
     var origin = new Date(e.data);
     while (true) {
         var now = new Date();
@@ -13,7 +14,7 @@ onmessage = (e) => {
         ) {
             break;
         }
-        sleep(86400000); // wait one day;
-    }
+        sleep(24*60*60*1000); // wait one day;
+    } // attente active 1 fois par jour
     postMessage('message');
 }

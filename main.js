@@ -6,7 +6,7 @@ const { Worker } = require("worker_threads"); // multi threading
 
 const pollsName = "pollSaved.json";
 //process.stdin.resume();
-process.on('SIGINT', () => {
+process.on("SIGINT", () => {
     console.log("Shut down, exiting");
     fs.readFile(pollsName, "utf8", function readFileCallback(err, data) {
         console.log("test"); // ne parvient pas ici
@@ -14,7 +14,7 @@ process.on('SIGINT', () => {
             console.log(err);
         } else {
             obj = JSON.parse(data);
-            obj.poll = polls.map( (poll) => poll.serialize );
+            obj.poll = polls.map((poll) => poll.serialize);
             json = JSON.stringify(obj);
             fs.writeFile(pollsName, json, (e) => {
                 if (e) throw e;
@@ -99,10 +99,10 @@ class Poll {
     serialize() {
         // save in file + need init file to load polls, reminder etc
         json = JSON.stringify({
-            "messageID":this.messageID,
-            "name":this.name,
-            "state":this.state,
-            "userReaction":this.userReaction
+            messageID: this.messageID,
+            name: this.name,
+            state: this.state,
+            userReaction: this.userReaction,
         });
         return json;
     }
@@ -148,7 +148,7 @@ function pollList() {
 function reminder(message, api) {
     var worker = new Worker("./worker.js");
     var mesCore = message.body.substr(message.body.indexOf(" ") + 1);
-    worker.onmessage = (e) => {
+    worker.onmessage = function (e) {
         api.sendMessage("Ding dong " + mesCore, message.threadID);
     };
     worker.postMessage(mesCore);
@@ -165,7 +165,7 @@ async function tell(message, api) {
         });
         console.log("Statut %i + '%s'", response.status, response.statusText);
         // todo : handle error status
-        writeGPT({
+        writeGPTLogs({
             headers: response.headers,
             status: response.status,
             config: response.config,
@@ -189,7 +189,7 @@ async function imagine(message, api) {
             size: "256x256",
         });
         console.log("Statut %i + '%s'", response.status, response.statusText);
-        writeGPT({
+        writeGPTLogs({
             headers: response.headers,
             status: response.status,
             config: response.config,
@@ -339,7 +339,7 @@ function init() {
             deserialize(poll);
             return poll;
         });
-    })
+    });
 }
 
 init();
