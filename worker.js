@@ -3,7 +3,7 @@ function sleep(ms) {
 }
 
 onmessage = function(e) {
-    console.log(e);
+    console.log(e.data);
     var origin = new Date(e.data);
     while (true) {
         var now = new Date();

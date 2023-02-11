@@ -4,28 +4,11 @@ const got = require("got"); // to scrap image from url
 const { exit } = require("process");
 const { Worker } = require("worker_threads"); // multi threading
 
-const pollsName = "pollSaved.json";
-//process.stdin.resume();
-process.on("SIGINT", () => {
-    console.log("Shut down, exiting");
-    fs.readFile(pollsName, "utf8", function readFileCallback(err, data) {
-        console.log("test"); // ne parvient pas ici
-        if (err) {
-            console.log(err);
-        } else {
-            obj = JSON.parse(data);
-            obj.poll = polls.map((poll) => poll.serialize);
-            json = JSON.stringify(obj);
-            fs.writeFile(pollsName, json, (e) => {
-                if (e) throw e;
-                console.log("Data written");
-            }); // write it back
-            console.log("Polls saved");
-            console.log(obj);
-        }
-    });
-    exit(1);
-});
+
+/* process.on("SIGINT", () => {
+    // volatile sig_atomic var quit = 1;
+    // periodicaly check if this var is on, then quit
+}); */
 
 const credential = {
     appState: JSON.parse(fs.readFileSync("appState.json", "utf-8")),
@@ -41,6 +24,23 @@ const emojis = ["👍", "😠", "😢", "😮", "😆", "❤"];
 const LIMIT_POLLS = 8;
 var polls = [];
 const jsonName = "opeanai-logs.json";
+const pollsName = "pollSaved.json";
+
+function quit() {
+    fs.readFile(pollsName, "utf8", function readFileCallback(err, data) {
+        if (err) {
+            console.log(err);
+        } else {
+            obj = JSON.parse(data); //now it an object
+            obj.poll = polls.map((poll) => poll.serialize());
+            fs.writeFile(pollsName, JSON.stringify(obj), (e) => {
+                if (e) throw e;
+                console.log("Polls saved");
+            }); // write it back
+        }
+        exit(1);
+    });
+}
 
 /*
 contains name, options bound to an emoji and counter for emoji, even with no option but doesn't print them
@@ -98,7 +98,7 @@ class Poll {
 
     serialize() {
         // save in file + need init file to load polls, reminder etc
-        json = JSON.stringify({
+        var json = JSON.stringify({
             messageID: this.messageID,
             name: this.name,
             state: this.state,
@@ -218,7 +218,7 @@ function writeGPTLogs(content) {
         } else {
             obj = JSON.parse(data); //now it an object
             obj.gpt.push(content); //add some data
-            json = JSON.stringify(obj); //convert it back to json
+            var json = JSON.stringify(obj); //convert it back to json
             fs.writeFile(jsonName, json, (e) => {
                 if (e) throw e;
                 console.log("Data written");
@@ -240,7 +240,7 @@ function handleMessage(message, api) {
 
     if (message.body == "exit") {
         console.log("Exit with message procedure");
-        exit(1);
+        quit();
     } else if (message.body.startsWith("remindme")) {
         console.log("Creating reminder");
         reminder(message, api);
