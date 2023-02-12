@@ -26,22 +26,6 @@ var polls = [];
 const jsonName = "opeanai-logs.json";
 const pollsName = "pollSaved.json";
 
-function quit() {
-    fs.readFile(pollsName, "utf8", function readFileCallback(err, data) {
-        if (err) {
-            console.log(err);
-        } else {
-            obj = JSON.parse(data); //now it an object
-            obj.poll = polls.map((poll) => poll.serialize());
-            fs.writeFile(pollsName, JSON.stringify(obj), (e) => {
-                if (e) throw e;
-                console.log("Polls saved");
-            }); // write it back
-        }
-        exit(1);
-    });
-}
-
 /*
 contains name, options bound to an emoji and counter for emoji, even with no option but doesn't print them
 Can be changed easily (print function)
@@ -56,7 +40,6 @@ class Poll {
         for (let i = 0; i < this.size; i++) {
             this.state.push([options[i], emojis[i], 0]); // option, emoji, nb of vote
         }
-        console.log(this.state);
     }
 
     add(emoji, user) {
@@ -98,22 +81,23 @@ class Poll {
 
     serialize() {
         // save in file + need init file to load polls, reminder etc
-        var json = JSON.stringify({
+        var json = {
             messageID: this.messageID,
             name: this.name,
             state: this.state,
             userReaction: this.userReaction,
-        });
+        };
         return json;
     }
 }
 
 function deserialize(dict) {
-    var p = new Poll(null, null, null);
+    var p = new Poll("null", "null", []);
     p.messageID = dict.messageID;
     p.name = dict.name;
     p.state = dict.state;
     p.userReaction = dict.userReaction;
+    return p;
 }
 
 // return message representing the poll named. 0 otherwised
@@ -328,6 +312,27 @@ function handleReaction(message_reaction) {
     }
 }
 
+function quit() {
+    fs.readFile(pollsName, "utf8", function readFileCallback(err, data) {
+        // on arrive ici mais le fichier fini vide quoi qu'on fasse, intéressant
+        if (err) {
+            console.log(err);
+        } else {
+            obj = JSON.parse(data); //now it an object
+            obj.poll = polls.map((poll) => poll.serialize());
+            console.log(obj);
+            console.log(JSON.stringify(obj));
+            fs.writeFileSync(pollsName, JSON.stringify(obj), (e) => {
+                if (e) {
+                    throw e;
+                }
+                console.log("Polls saved");
+            }); // write it back
+        }
+        exit(-1);
+    });
+}
+
 function init() {
     fs.readFile(pollsName, "utf8", function readFileCallback(err, data) {
         if (err) {
@@ -335,9 +340,9 @@ function init() {
             exit(-1);
         }
         obj = JSON.parse(data);
-        polls = obj.poll.map((poll) => {
-            deserialize(poll);
-            return poll;
+        polls = [];
+        obj.poll.forEach(poll => {
+            polls.push(deserialize(poll));
         });
     });
 }
@@ -363,3 +368,5 @@ login(credential, (err, api) => {
 // todo : quote me
 // todo : handle error
 // todo : régler le problème de sigint
+
+// si je créé un poll avec un nom déjà présent, ça me le dit mais ça créé quand même un poll
