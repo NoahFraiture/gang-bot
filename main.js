@@ -165,10 +165,10 @@ async function tell(message, api) {
 }
 
 async function imagine(message, api) {
-    var text = message.body.substr(message.body.indexOf(" ") + 1);
+    var demand = message.body.substr(message.body.indexOf(" ") + 1);
     try {
         const response = await openai.createImage({
-            prompt: text,
+            prompt: demand,
             n: 1,
             size: "256x256",
         });
@@ -177,17 +177,17 @@ async function imagine(message, api) {
             headers: response.headers,
             status: response.status,
             config: response.config,
-            //"request":response.request, //got error here, but not necessary so is ok
             data: response.data,
         });
         url = response.data.data[0].url;
-        await got.stream(url).pipe(fs.createWriteStream("image.png"));
-        var answer = {
-            body: text,
-            attachment: fs.createReadStream(__dirname + "/image.png"),
-        };
-        api.sendMessage(answer, message.threadID);
-        console.log("Image sent");
+        await got.stream(url).pipe(fs.createWriteStream("image.png")).on("finish", async()=>{
+            var answer = {
+                body: demand,
+                attachment: fs.createReadStream(__dirname + "/image.png"),
+            };
+            api.sendMessage(answer, message.threadID);
+            console.log("Image sent");
+        });
     } catch (e) {
         console.log(e);
         api.sendMessage("Error in generation of an image", message.threadID);
@@ -286,6 +286,12 @@ function handleMessage(message, api) {
     } else if (message.body.startsWith("imagine")) {
         console.log("Generating image");
         imagine(message, api);
+    } else if (message.body.startsWith("show ")) {
+        var ans = {
+            body:"yo",
+            attachment: fs.createReadStream(__dirname + "/image.png")
+        }
+        api.sendMessage(ans, message.threadID);
     } else if (message.body == "ping") {
         api.sendMessage("pong", message.threadID);
         console.log("Ping Pong operation !");

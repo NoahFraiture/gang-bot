@@ -1,20 +1,17 @@
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
+const cron = require('node-cron');
 
 onmessage = function(e) {
     console.log(e.data);
     var origin = new Date(e.data);
-    while (true) {
+    cron.schedule("* * *", function() {
         var now = new Date();
         if (
             origin.getFullYear() == now.getFullYear() &&
             origin.getMonth() == now.getMonth() &&
             origin.getDate() == now.getDate()
         ) {
-            break;
+            postMessage('message');
+            return;
         }
-        sleep(24*60*60*1000); // wait one day;
-    } // attente active 1 fois par jour
-    postMessage('message');
+    });
 }
