@@ -133,7 +133,7 @@ function reminder(message, api) {
     var worker = new Worker("./worker.js");
     var mesCore = message.body.substr(message.body.indexOf(" ") + 1);
     worker.onmessage = function (e) {
-        api.sendMessage("Ding dong " + mesCore, message.threadID);
+        api.sendMessage("Ding dong " + mesCore, message.threadID, message.messageID);
     };
     worker.postMessage(mesCore);
 }
@@ -164,14 +164,23 @@ async function tell(message, api) {
     }
 }
 
-async function imagine(message, api) {
+async function imagine(message, api, content) {
     var demand = message.body.substr(message.body.indexOf(" ") + 1);
     try {
-        const response = await openai.createImage({
-            prompt: demand,
-            n: 1,
-            size: "256x256",
-        });
+        if (content == undefined) {
+            const response = await openai.createImage({
+                prompt: demand,
+                n: 1,
+                size: "256x256",
+            });
+        } else {
+            const response = await openai.createImage({
+                image:content,
+                prompt: demand,
+                n: 1,
+                size: "256x256",
+            });
+        }
         console.log("Statut %i + '%s'", response.status, response.statusText);
         writeGPTLogs({
             headers: response.headers,
@@ -285,7 +294,11 @@ function handleMessage(message, api) {
         tell(message, api); // asynchronous so need to handle everything in the function
     } else if (message.body.startsWith("imagine")) {
         console.log("Generating image");
-        imagine(message, api);
+        if (message.attachment) {
+            
+        } else {
+            imagine(message, api);
+        }
     } else if (message.body.startsWith("show ")) {
         var ans = {
             body:"yo",
