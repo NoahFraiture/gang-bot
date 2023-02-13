@@ -3,7 +3,8 @@ const fs = require("fs");
 const got = require("got"); // to scrap image from url
 const { exit } = require("process");
 const { Worker } = require("worker_threads"); // multi threading
-
+const quality = "256x256";
+const tokens = 30;
 
 /* process.on("SIGINT", () => {
     // volatile sig_atomic var quit = 1;
@@ -145,7 +146,7 @@ async function tell(message, api) {
             model: "text-davinci-003", // "text-davinci-003",
             prompt: text,
             temperature: 0.6,
-            max_tokens: 7,
+            max_tokens: tokens,
         });
         console.log("Statut %i + '%s'", response.status, response.statusText);
         // todo : handle error status
@@ -164,23 +165,51 @@ async function tell(message, api) {
     }
 }
 
-async function imagine(message, api, content) {
-    var demand = message.body.substr(message.body.indexOf(" ") + 1);
+async function createImage(demand) {
     try {
-        if (content == undefined) {
-            const response = await openai.createImage({
-                prompt: demand,
-                n: 1,
-                size: "256x256",
-            });
-        } else {
-            const response = await openai.createImage({
-                image:content,
-                prompt: demand,
-                n: 1,
-                size: "256x256",
-            });
-        }
+        return await openai.createImage({
+            prompt: demand,
+            n: 1,
+            size: quality,
+        });
+    } catch (e) {
+        console.log(e);
+        return 0;
+    }
+}
+
+async function createEdit(demand, filename) {
+    try {
+        return await openai.createImageEdit({ // error but why mmmmmmmmh
+            "image":fs.createReadStream(filename),
+            "mask":fs.createReadStream("mask.png"),
+            "prompt":demand,
+            "size":quality
+        });
+    } catch (e) {
+        console.log(e);
+        return 0;
+    }
+}
+
+async function createVariation(filename) {
+    try {
+        return await openai.createImageVariation(
+            fs.createReadStream(filename),
+            1,
+            quality
+        );
+    } catch (e) {
+        console.log(e);
+        console.log("here !")
+        return 0;
+    }
+}
+
+async function imagine(message, api) {
+    try {
+        const demand = message.body.substr(message.body.indexOf(" ") + 1);
+        const response = await createImage(demand);
         console.log("Statut %i + '%s'", response.status, response.statusText);
         writeGPTLogs({
             headers: response.headers,
@@ -189,13 +218,64 @@ async function imagine(message, api, content) {
             data: response.data,
         });
         url = response.data.data[0].url;
-        await got.stream(url).pipe(fs.createWriteStream("image.png")).on("finish", async()=>{
+        await got.stream(url).pipe(fs.createWriteStream("generation.png")).on("finish", async()=>{
             var answer = {
                 body: demand,
-                attachment: fs.createReadStream(__dirname + "/image.png"),
+                attachment: fs.createReadStream("generation.png"),
             };
             api.sendMessage(answer, message.threadID);
             console.log("Image sent");
+        });
+    } catch (e) {
+        console.log(e);
+        api.sendMessage("Error in generation of an image", message.threadID);
+    }
+}
+
+async function variation(message, api) {
+    const demand = message.messageReply.body.substr(message.body.indexOf(" ") + 1);
+    var url_input = message.messageReply.attachments[0].previewUrl;
+    try {
+        // save input image in "variation.png"
+        await got.stream(url_input).pipe(fs.createWriteStream("variation.png")).on("finish", async()=>{
+            const response = await createVariation("variation.png");
+            var url_output = response.data.data[0].url;
+
+            // save output image in "generation.png"
+            await got.stream(url_output).pipe(fs.createWriteStream("generation.png")).on("finish", async()=>{
+                var answer = {
+                    body: demand,
+                    attachment: fs.createReadStream("generation.png"),
+                }
+                api.sendMessage(answer, message.threadID);
+                console.log("Image Sent");
+            });
+        });
+    } catch (e) {
+        console.log(e);
+        api.sendMessage("Error in generation of an image", message.threadID);
+    }
+}
+
+async function edit(message, api) {
+    const demand = message.body.substr(message.body.indexOf(" ") + 1);
+    var url_input = message.messageReply.attachments[0].previewUrl;
+    try {
+        // save input image in "variation.png"
+        await got.stream(url_input).pipe(fs.createWriteStream("variation.png")).on("finish", async()=>{
+            const response = await createEdit(demand, "variation.png");
+            var url_output = response.data.data[0].url;
+            console.log(url_output);
+
+            // save output image in "generation.png"
+            await got.stream(url_output).pipe(fs.createWriteStream("generation.png")).on("finish", async()=>{
+                var answer = {
+                    body: demand,
+                    attachment: fs.createReadStream("generation.png"),
+                }
+                api.sendMessage(answer, message.threadID);
+                console.log("Image Sent");
+            });
         });
     } catch (e) {
         console.log(e);
@@ -294,11 +374,7 @@ function handleMessage(message, api) {
         tell(message, api); // asynchronous so need to handle everything in the function
     } else if (message.body.startsWith("imagine")) {
         console.log("Generating image");
-        if (message.attachment) {
-            
-        } else {
-            imagine(message, api);
-        }
+        imagine(message, api);
     } else if (message.body.startsWith("show ")) {
         var ans = {
             body:"yo",
@@ -328,6 +404,23 @@ function handleReaction(message_reaction) {
         if (polls[i].messageID == message_reaction.messageID) {
             polls[i].add(message_reaction.reaction, message_reaction.userID);
         }
+    }
+}
+
+function handleReply(message, api) {
+    if (message.body == undefined) return;
+    console.log(
+        " Reply message : %s \n from : %i \n to message %s",
+        JSON.stringify(message.body),
+        message.threadID,
+        JSON.stringify(message.messageReply.body)
+    );
+    if (message.body == "variation") {
+        console.log("Generation variation");
+        variation(message, api);
+    } else if (message.body.startsWith("edit ")) {
+        console.log("Editing image");
+        edit(message, api);
     }
 }
 
@@ -375,6 +468,7 @@ login(credential, (err, api) => {
         if (err) return console.log(err);
         if (message.type == "message") handleMessage(message, api);
         if (message.type == "message_reaction") handleReaction(message);
+        if (message.type == "message_reply") handleReply(message, api);
     });
 });
 
