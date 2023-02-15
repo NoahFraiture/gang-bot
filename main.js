@@ -4,7 +4,7 @@ const got = require("got"); // to scrap image from url
 const { exit } = require("process");
 const { Worker } = require("worker_threads"); // multi threading
 const quality = "256x256";
-const tokens = 30;
+const tokens = 100;
 
 /* process.on("SIGINT", () => {
     // volatile sig_atomic var quit = 1;
@@ -24,7 +24,7 @@ const openai = new OpenAIApi(configuration);
 const emojis = ["👍", "😠", "😢", "😮", "😆", "❤"];
 const LIMIT_POLLS = 8;
 var polls = [];
-const jsonName = "opeanai-logs.json";
+const jsonName = "logs.json";
 const pollsName = "pollSaved.json";
 
 /*
@@ -32,12 +32,13 @@ contains name, options bound to an emoji and counter for emoji, even with no opt
 Can be changed easily (print function)
 */
 class Poll {
-    constructor(messageID, name, options) {
+    constructor(messageID, name, options, thread) {
         this.name = name;
         this.messageID = messageID;
         this.userReaction = [];
         this.state = [];
         this.size = options.length;
+        this.thread = thread;
         for (let i = 0; i < this.size; i++) {
             this.state.push([options[i], emojis[i], 0]); // option, emoji, nb of vote
         }
@@ -87,17 +88,19 @@ class Poll {
             name: this.name,
             state: this.state,
             userReaction: this.userReaction,
+            thread:this.thread
         };
         return json;
     }
 }
 
 function deserialize(dict) {
-    var p = new Poll("null", "null", []);
+    var p = new Poll("null", "null", [], "null");
     p.messageID = dict.messageID;
     p.name = dict.name;
     p.state = dict.state;
     p.userReaction = dict.userReaction;
+    p.thread = dict.thread
     return p;
 }
 
@@ -120,13 +123,71 @@ function createPollInfos(content) {
     return [name, options];
 }
 
+function createPoll(message, api) {
+    // create message of poll
+    var pollMessage = createPollInfos(message.body); // name-str ; options-list(str)
+    if (searchPoll(pollMessage[0].trim()) != 0) {
+        api.sendMessage(
+            "A poll with this name already exists",
+            message.threadID
+        );
+        console.log("A poll with this name already exists");
+        return;
+    }
+    var mes = pollMessage[0] + "\n";
+    for (let i = 0; i < pollMessage[1].length; i++) {
+        mes = mes + pollMessage[1][i] + " " + emojis[i] + "\n";
+    }
+
+    // send message and get his id to create a Poll()
+    api.sendMessage(mes, message.threadID, (err, sentMessageInfo) => {
+        if (err) {
+            console.error(err);
+            return err;
+        }
+        polls.push(
+            new Poll(
+                sentMessageInfo.messageID,
+                pollMessage[0].trim(),
+                pollMessage[1],
+                sentMessageInfo.threadID // todo : empty but why ?
+            )
+        );
+        console.log('Poll created "%s"', pollMessage[0]);
+    });
+    writeCommandLogs({
+        "type": "create poll",
+        "request": pollMessage,
+        "author": message.senderID,
+        "thread": message.threadID
+    });
+}
+
 // return list of poll's name
-function pollList() {
+function pollList(threadID) {
     var mes = "";
     for (let i = 0; i < polls.length; i++) {
+        //if (polls[i].thread == threadID) {
         mes = mes + polls[i].name + "\n";
+        //}
     }
     return mes;
+}
+
+function listpoll(message, api) {
+    var mes = pollList(message.threadID);
+    if (mes == "") {
+        console.log("No poll found");
+    } else {
+        api.sendMessage(pollList(), message.threadID);
+        console.log("Polls list printed");
+    }
+    writeCommandLogs({
+        "type": "listpoll",
+        "author": message.senderID,
+        "thread": message.threadID,
+        "polls": mes
+    });
 }
 
 // start workers and sendMessage when reach date at the same time of the day of the command
@@ -150,12 +211,16 @@ async function tell(message, api) {
         });
         console.log("Statut %i + '%s'", response.status, response.statusText);
         // todo : handle error status
-        writeGPTLogs({
-            headers: response.headers,
-            status: response.status,
-            config: response.config,
-            //"request":response.request, //got error here, but not necessary so is ok
-            data: response.data,
+        writeCommandLogs({
+            "type": "gpt",
+            "request": text,
+            "author": message.senderID,
+            "thread": message.threadID,
+            "headers": response.headers,
+            "status": response.status,
+            "config": response.config,
+            "data": response.data,
+            "content": response.data.choices[0].text
         });
         api.sendMessage(response.data.choices[0].text.trim(), message.threadID);
         console.log("Response sent");
@@ -180,12 +245,14 @@ async function createImage(demand) {
 
 async function createEdit(demand, filename) {
     try {
-        return await openai.createImageEdit({ // error but why mmmmmmmmh
-            "image":fs.createReadStream(filename),
-            "mask":fs.createReadStream("mask.png"),
-            "prompt":demand,
-            "size":quality
-        });
+        console.log(filename);
+        return await openai.createImageEdit( // error but why mmmmmmmmh
+            fs.createReadStream(filename),
+            fs.createReadStream("mask.png"),
+            demand,
+            1,
+            quality
+        );
     } catch (e) {
         console.log(e);
         return 0;
@@ -211,11 +278,16 @@ async function imagine(message, api) {
         const demand = message.body.substr(message.body.indexOf(" ") + 1);
         const response = await createImage(demand);
         console.log("Statut %i + '%s'", response.status, response.statusText);
-        writeGPTLogs({
-            headers: response.headers,
-            status: response.status,
-            config: response.config,
-            data: response.data,
+        writeCommandLogs({
+            "type": "imagine",
+            "request": demand,
+            "author": message.senderID,
+            "thread": message.threadID,
+            "headers": response.headers,
+            "status": response.status,
+            "config": response.config,
+            "data": response.data,
+            "url": response.data.data[0].url
         });
         url = response.data.data[0].url;
         await got.stream(url).pipe(fs.createWriteStream("generation.png")).on("finish", async()=>{
@@ -238,8 +310,20 @@ async function variation(message, api) {
     try {
         // save input image in "variation.png"
         await got.stream(url_input).pipe(fs.createWriteStream("variation.png")).on("finish", async()=>{
-            const response = await createVariation("variation.png");
+            const response = await createVariation("variation.png"); // ça a l'air tellement à chier
             var url_output = response.data.data[0].url;
+
+            writeCommandLogs({
+                "type": "variation",
+                "request": demand,
+                "author": message.senderID,
+                "thread": message.threadID,
+                "headers": response.headers,
+                "status": response.status,
+                "config": response.config,
+                "data": response.data,
+                "url": response.data.data[0].url
+            });
 
             // save output image in "generation.png"
             await got.stream(url_output).pipe(fs.createWriteStream("generation.png")).on("finish", async()=>{
@@ -257,6 +341,7 @@ async function variation(message, api) {
     }
 }
 
+// marche pas encore, nécessite un mask qui sert à rien
 async function edit(message, api) {
     const demand = message.body.substr(message.body.indexOf(" ") + 1);
     var url_input = message.messageReply.attachments[0].previewUrl;
@@ -284,20 +369,51 @@ async function edit(message, api) {
 }
 
 // write in json file, content = dictionnary
-function writeGPTLogs(content) {
+function writeCommandLogs(content) {
+    var currentdate = new Date(); 
+    var datetime = "Last Sync: " + currentdate.getDate() + "/"
+                + (currentdate.getMonth()+1)  + "/" 
+                + currentdate.getFullYear() + " @ "  
+                + currentdate.getHours() + ":"  
+                + currentdate.getMinutes() + ":" 
+                + currentdate.getSeconds();
+    content["time"] = datetime;
     fs.readFile(jsonName, "utf8", function readFileCallback(err, data) {
         if (err) {
             console.log(err);
         } else {
             obj = JSON.parse(data); //now it an object
-            obj.gpt.push(content); //add some data
+            obj.command.push(content); //add some data
             var json = JSON.stringify(obj); //convert it back to json
-            fs.writeFile(jsonName, json, (e) => {
+            fs.writeFileSync(jsonName, json, (e) => {
                 if (e) throw e;
-                console.log("Data written");
             }); // write it back
         }
     });
+}
+
+function writeMessageLogs(content) {
+    var currentdate = new Date(); 
+    var datetime = "Last Sync: " + currentdate.getDate() + "/"
+                + (currentdate.getMonth()+1)  + "/" 
+                + currentdate.getFullYear() + " @ "  
+                + currentdate.getHours() + ":"  
+                + currentdate.getMinutes() + ":" 
+                + currentdate.getSeconds();
+    content["time"] = datetime;
+    fs.readFile(jsonName, "utf8", function readFileCallback(err, data) {
+        if (err) {
+            console.log(err);
+        } else {
+            obj = JSON.parse(data); //now it an object
+            obj.message.push(content); //add some data
+            var json = JSON.stringify(obj); //convert it back to json
+            fs.writeFileSync(jsonName, json, (e) => {
+                if (e) throw e;
+            }); // write it back
+        }
+    });
+
 }
 
 // use third-party function to compute the data
@@ -310,46 +426,25 @@ function handleMessage(message, api) {
         JSON.stringify(message.body),
         message.threadID
     );
+    writeMessageLogs({
+        "type":"message",
+        "content":message.body,
+        "author":message.senderID,
+        "id":message.messageID,
+        "threadID":message.threadID
+    });
 
     if (message.body == "exit") {
         console.log("Exit with message procedure");
         quit();
     } else if (message.body.startsWith("remindme")) {
+        return;
         console.log("Creating reminder");
         reminder(message, api);
         console.log("Reminder created");
     } else if (message.body.startsWith("poll")) {
         console.log("Creating poll");
-
-        // create message of poll
-        var pollMessage = createPollInfos(message.body); // name-str ; options-list(str)
-        if (searchPoll(pollMessage[0].trim()) != 0) {
-            api.sendMessage(
-                "A poll with this name already exists",
-                message.threadID
-            );
-            console.log("A poll with this name already exists");
-        }
-        var mes = pollMessage[0] + "\n";
-        for (let i = 0; i < pollMessage[1].length; i++) {
-            mes = mes + pollMessage[1][i] + " " + emojis[i] + "\n";
-        }
-
-        // send message and get his id to create a Poll()
-        api.sendMessage(mes, message.threadID, (err, sentMessageInfo) => {
-            if (err) {
-                console.error(err);
-                return err;
-            }
-            polls.push(
-                new Poll(
-                    sentMessageInfo.messageID,
-                    pollMessage[0].trim(),
-                    pollMessage[1]
-                )
-            );
-            console.log('Poll created "%s"', pollMessage[0]);
-        });
+        createPoll(message, api);
     } else if (message.body.startsWith("getpoll ")) {
         console.log("Searching poll");
         var name = message.body.slice("getpoll".length + 1);
@@ -361,29 +456,29 @@ function handleMessage(message, api) {
         } else {
             console.log('Error : Poll "%s" not found', name);
         }
+        writeCommandLogs({
+            "type": "getpoll",
+            "request": pollText,
+            "author": message.senderID,
+            "thread": message.threadID,
+        });
     } else if (message.body.startsWith("listpoll")) {
-        var mes = pollList();
-        if (mes == "") {
-            console.log("No poll found");
-        } else {
-            api.sendMessage(pollList(), message.threadID);
-            console.log("Polls list printed");
-        }
+        listpoll(message, api);
     } else if (message.body.startsWith("tell")) {
         console.log("Requesting GPT3");
         tell(message, api); // asynchronous so need to handle everything in the function
     } else if (message.body.startsWith("imagine")) {
         console.log("Generating image");
         imagine(message, api);
-    } else if (message.body.startsWith("show ")) {
-        var ans = {
-            body:"yo",
-            attachment: fs.createReadStream(__dirname + "/image.png")
-        }
-        api.sendMessage(ans, message.threadID);
     } else if (message.body == "ping") {
         api.sendMessage("pong", message.threadID);
         console.log("Ping Pong operation !");
+    } else if (message.body.startsWith("help")) {
+        var help = "tell ... : chatgpt\n" +
+        "imagine ... : dall-e\n" +
+        "variation + reply a picture : dall-e variation\n"
+        "poll "
+        api.sendMessage()
     } else {
         api.sendMessage(message.body, message.threadID);
         console.log(
@@ -400,6 +495,13 @@ function handleReaction(message_reaction) {
         message_reaction.userID,
         message_reaction.reaction
     );
+    writeMessageLogs({
+        "type":"reaction",
+        "content":message_reaction.reaction,
+        "author":message_reaction.senderID,
+        "id":message_reaction.messageID,
+        "threadID":message_reaction.threadID,
+    })
     for (let i = 0; i < polls.length; i++) {
         if (polls[i].messageID == message_reaction.messageID) {
             polls[i].add(message_reaction.reaction, message_reaction.userID);
@@ -415,10 +517,19 @@ function handleReply(message, api) {
         message.threadID,
         JSON.stringify(message.messageReply.body)
     );
+    writeMessageLogs({
+        "type":"reply",
+        "content":message.body,
+        "author":message.senderID,
+        "id":message.messageID,
+        "threadID":message.threadID,
+        "reply":message.messageReply.messageID
+    })
     if (message.body == "variation") {
         console.log("Generation variation");
         variation(message, api);
     } else if (message.body.startsWith("edit ")) {
+        return;
         console.log("Editing image");
         edit(message, api);
     }
@@ -432,8 +543,6 @@ function quit() {
         } else {
             obj = JSON.parse(data); //now it an object
             obj.poll = polls.map((poll) => poll.serialize());
-            console.log(obj);
-            console.log(JSON.stringify(obj));
             fs.writeFileSync(pollsName, JSON.stringify(obj), (e) => {
                 if (e) {
                     throw e;
@@ -481,5 +590,4 @@ login(credential, (err, api) => {
 // todo : quote me
 // todo : handle error
 // todo : régler le problème de sigint
-
-// si je créé un poll avec un nom déjà présent, ça me le dit mais ça créé quand même un poll
+// sentback du sendmessage ne marche pas, faut aller toucher à l'apii

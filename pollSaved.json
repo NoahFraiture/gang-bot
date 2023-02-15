@@ -1,10 +1,1 @@
-{
-    "poll": [
-        {
-            "messageID": "mid.$cAAAB_Yz75KSMeF5ZiWGR1APMCfX9",
-            "name": "s",
-            "state": [["1", "👍", 1]],
-            "userReaction": [["100010503455999", "👍"]]
-        }
-    ]
-}
+{"poll":[{"messageID":"mid.$cAAAB_Yz75KSMhY5u8WGVEklfzFth","name":"s","state":[["s","👍",1]],"userReaction":[["100010503455999","👍"]],"thread":""}]}
