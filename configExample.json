@@ -6,6 +6,7 @@
         "polls_max":8,
         "store_max":8,
         "emojis":["👍", "😠", "😢", "😮", "😆", "❤"],
-        "logsOn":false
+        "logsOn":false,
+        "backupOn":true
     }
 ]

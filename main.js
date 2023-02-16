@@ -20,6 +20,7 @@ const LIMIT_MESSAGE_STORED = configFile.store_max;
 const emojis = configFile.emojis;
 const key = configFile.key;
 const logsOn = configFile.logsOn;
+const backupOn = configFile.backupOn;
 
 const { Configuration, OpenAIApi } = require("openai");
 const configuration = new Configuration({
@@ -196,7 +197,7 @@ function listpoll(message, api) {
     });
 }
 
-// remind at sent date MM-DD-YYYY. Test : works with timestamp
+// remind at sent date MM-DD-YYYY. Test : works with timestamp. Need test to see if it's good units. Should be good
 function reminder(message, api) {
     var mesCore = message.body.substr(message.body.indexOf(" ") + 1);
     var end = new Date(mesCore);
@@ -728,6 +729,12 @@ login(credential, (err, api) => {
         if (message.type == "message_reply") handleReply(message, api);
     });
 });
+
+while (backupOn) {
+    setTimeout(() => {
+        backup();
+    }, 1000*60*60);
+}
 
 // todo : quote me
 
