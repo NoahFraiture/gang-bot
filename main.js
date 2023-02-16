@@ -195,7 +195,7 @@ function listpoll(message, api) {
     });
 }
 
-// start workers and sendMessage when reach date at the same time of the day of the command
+// remind at sent date MM-DD-YYYY. Test : works with timestamp
 function reminder(message, api) {
     var mesCore = message.body.substr(message.body.indexOf(" ") + 1);
     var end = new Date(mesCore);
@@ -207,7 +207,13 @@ function reminder(message, api) {
         reminders.push(message);
         setTimeout(() => {
             console.log("Reminder from message %d", message.messageID);
-            api.sendMessage("Ding dong it's time", message.threadID, message.messageID)
+            api.sendMessage(
+                {
+                    body:"Ding dong it's time @Sender",
+                    mentions: [{tag:"@Sender" ,id:message.senderID}]
+                },
+                message.threadID, message.messageID
+            );
             var index = reminders.indexOf(message);
             if (index !== -1) {
                 reminders.splice(index, 1);
@@ -501,6 +507,7 @@ function handleMessage(message, api) {
         var help = "tell ... : chatgpt\n" +
         "imagine ... : dall-e\n" +
         "variation + reply a picture : dall-e variation\n" +
+        "remindme MM-DD-YYYY : set a reminder\n" +
         "save ... + reply a message : save the message, callable with listmessage and getmessage ...\n" +
         "poll ...\n...\n... : create a poll with a name and option, callable with listpoll and getpoll ...\n"
         api.sendMessage(help, message.senderID);
@@ -640,6 +647,7 @@ function handleReply(message, api) {
     }
 }
 
+// save reminders, polls and saved message in state.json
 function backup() {
     fs.readFile(stateName, "utf8", function readFileCallback(err, data) {
         // on arrive pas ici
@@ -661,6 +669,8 @@ function backup() {
     });
 }
 
+// copy of backup within exit function. The readfile is async so without that it doesn't
+// have the time to backup
 function quit() {
     fs.readFile(stateName, "utf8", function readFileCallback(err, data) {
         // on arrive pas ici
@@ -682,6 +692,7 @@ function quit() {
     });
 }
 
+// reload state.json
 function init(api) {
     fs.readFile(stateName, "utf8", function readFileCallback(err, data) {
         if (err) {
@@ -712,19 +723,11 @@ login(credential, (err, api) => {
     });
 });
 
-// on arrive ici, le login est aynchrone
-
-// todo : stay in node when execute file for noah-bot
-
-// use asynchron function for worker ? how does it work ?
-
-// todo : tester le reminder et ajouter des options de parse
-// todo : dall-e, options pour gpt
 // todo : quote me
-// todo : handle error
-// todo : régler le problème de sigint
-// sentback du sendmessage ne marche pas, faut aller toucher à l'api
-// store saved message in case of quit, faut serialize tout ça je crois
 
-// backup marche pas
-// list remind marche pas
+// todo : régler le problème de sigint
+
+// sentback du sendmessage ne marche pas, faut aller toucher à l'api. On a pas le threadID mais je peux rien y faire on dirait
+// c'est pour différencier les threads et avoir des instances de données différentes, on verra bien
+
+// reminder ping la personne + parser peut être

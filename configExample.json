@@ -1,0 +1,10 @@
+[
+    {
+        "key":"YOUR-OPENAI-KEY",
+        "quality":"256x256",
+        "tokens":100,
+        "polls_max":8,
+        "store_max":8,
+        "emojis":["👍", "😠", "😢", "😮", "😆", "❤"]
+    }
+]
