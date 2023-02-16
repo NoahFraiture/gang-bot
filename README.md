@@ -15,10 +15,10 @@ You'll also have to add you personnal openai key in the config file. You have an
 
 # Features
 
-save : you can save message to get them back later easily without have to scroll the whole conversation
-poll : you can create poll easily and see them when you want. RIP old messenger polls
-remindme : you can create a reminder
-tell : gpt can answer to you
-imagine : dall-e can create what you want
+```save``` : you can save message to get them back later easily without have to scroll the whole conversation  
+```poll``` : you can create poll easily and see them when you want. RIP old messenger polls  
+```remindme``` : you can create a reminder  
+```tell``` : gpt can answer to you  
+```imagine``` : dall-e can create what you want  
 
 backup will regularly save your polls, saved message and reminder in case of crash. A log file also save every command. There's an option in the config file to save every message. False by default, privacy is important.
