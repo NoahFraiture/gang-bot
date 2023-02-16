@@ -23,7 +23,9 @@ const openai = new OpenAIApi(configuration);
 
 const emojis = ["👍", "😠", "😢", "😮", "😆", "❤"];
 const LIMIT_POLLS = 8;
+const LIMIT_MESSAGE_STORED = 8;
 var polls = [];
+var storeMessage = [];
 const jsonName = "logs.json";
 const pollsName = "pollSaved.json";
 
@@ -478,7 +480,28 @@ function handleMessage(message, api) {
         "imagine ... : dall-e\n" +
         "variation + reply a picture : dall-e variation\n"
         "poll "
-        api.sendMessage()
+        api.sendMessage(help, message.threadID);
+    } else if (message.body == "listsaved") {
+        var mes = "";
+        storeMessage.forEach(element => {
+            mes += element[0] + "\n";
+        });
+        api.sendMessage(mes, message.threadID);
+    } else if (message.body.startsWith("getmessage ")) {
+        var demand = message.body.substr(message.body.indexOf(" ") + 1);
+        var reply = "";
+        var id = ""
+        storeMessage.forEach(element => {
+            if (element[0] == demand) {
+                reply = ("ici");
+                id = element[1].messageReply.messageID;
+            }
+        });
+        if (reply == "") {
+            api.sendMessage("not found", message.threadID);
+        } else {
+        api.sendMessage(reply, message.threadID, id);
+        }
     } else {
         api.sendMessage(message.body, message.threadID);
         console.log(
@@ -532,6 +555,22 @@ function handleReply(message, api) {
         return;
         console.log("Editing image");
         edit(message, api);
+    } else if (message.body.startsWith("save ")) {
+        var name = message.body.substr(message.body.indexOf(" ") + 1);
+        var out = 0;
+        storeMessage.forEach(element => {
+            if (element[0] == name) {
+                api.sendMessage("Already a message saved with this", message.threadID);
+                out = 1;
+                return;
+            }
+        });
+        if (out == 1) return;
+        storeMessage.push([name, message]);
+        if (storeMessage.length > LIMIT_MESSAGE_STORED) {
+            storeMessage.shift;
+        }
+        console.log("message saved");
     }
 }
 
@@ -543,6 +582,7 @@ function quit() {
         } else {
             obj = JSON.parse(data); //now it an object
             obj.poll = polls.map((poll) => poll.serialize());
+            obj.saved = storeMessage;
             fs.writeFileSync(pollsName, JSON.stringify(obj), (e) => {
                 if (e) {
                     throw e;
@@ -565,6 +605,7 @@ function init() {
         obj.poll.forEach(poll => {
             polls.push(deserialize(poll));
         });
+        storeMessage = obj.saved;
     });
 }
 
@@ -590,4 +631,8 @@ login(credential, (err, api) => {
 // todo : quote me
 // todo : handle error
 // todo : régler le problème de sigint
-// sentback du sendmessage ne marche pas, faut aller toucher à l'apii
+// sentback du sendmessage ne marche pas, faut aller toucher à l'api
+// store saved message in case of quit, faut serialize tout ça je crois
+
+// idée reminder : check tout les reminders à la réception d'un message particulier
+// autre bot qui envoie des messages réguliers
