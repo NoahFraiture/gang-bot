@@ -2,9 +2,6 @@ const login = require("facebook-chat-api");
 const fs = require("fs");
 const got = require("got"); // to scrap image from url
 const { exit } = require("process");
-const { Worker } = require("worker_threads"); // multi threading
-const quality = "256x256";
-const tokens = 100;
 
 /* process.on("SIGINT", () => {
     // volatile sig_atomic var quit = 1;
@@ -15,19 +12,25 @@ const credential = {
     appState: JSON.parse(fs.readFileSync("appState.json", "utf-8")),
 };
 
+const configFile = JSON.parse(fs.readFileSync("config.json", "utf-8"));
+const quality = configFile.quality
+const tokens = configFile.tokens
+const LIMIT_POLLS = configFile.polls_max;
+const LIMIT_MESSAGE_STORED = configFile.store_max;
+const emojis = configFile.emojis;
+const key = configFile.key;
+
 const { Configuration, OpenAIApi } = require("openai");
 const configuration = new Configuration({
-    apiKey: "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",
-}); // todo : hide
+    apiKey: key,
+});
 const openai = new OpenAIApi(configuration);
 
-const emojis = ["👍", "😠", "😢", "😮", "😆", "❤"];
-const LIMIT_POLLS = 8;
-const LIMIT_MESSAGE_STORED = 8;
 var polls = [];
 var storeMessage = [];
+var reminders = [];
 const jsonName = "logs.json";
-const pollsName = "pollSaved.json";
+const stateName = "state.json";
 
 /*
 contains name, options bound to an emoji and counter for emoji, even with no option but doesn't print them
@@ -194,12 +197,23 @@ function listpoll(message, api) {
 
 // start workers and sendMessage when reach date at the same time of the day of the command
 function reminder(message, api) {
-    var worker = new Worker("./worker.js");
     var mesCore = message.body.substr(message.body.indexOf(" ") + 1);
-    worker.onmessage = function (e) {
-        api.sendMessage("Ding dong " + mesCore, message.threadID, message.messageID);
-    };
-    worker.postMessage(mesCore);
+    var end = new Date(mesCore);
+    var now = new Date();
+    if (end < now) {
+        console.log("invalid date");
+        api.sendMessage("Invalid date. Format MM-DD-YYYY");
+    } else {
+        reminders.push(message);
+        setTimeout(() => {
+            console.log("Reminder from message %d", message.messageID);
+            api.sendMessage("Ding dong it's time", message.threadID, message.messageID)
+            var index = reminders.indexOf(message);
+            if (index !== -1) {
+                reminders.splice(index, 1);
+            }
+        }, end - new Date());
+    }
 }
 
 async function tell(message, api) {
@@ -440,10 +454,16 @@ function handleMessage(message, api) {
         console.log("Exit with message procedure");
         quit();
     } else if (message.body.startsWith("remindme")) {
-        return;
         console.log("Creating reminder");
         reminder(message, api);
         console.log("Reminder created");
+    } else if (message.body == "listremind") {
+        var mes = ""
+        reminders.forEach(element => {
+            mes += (element.body.substr(message.body.indexOf(" ") + 1));
+        });
+        api.sendMessage(mes, message.threadID);
+        console.log("list of reminders printed");
     } else if (message.body.startsWith("poll")) {
         console.log("Creating poll");
         createPoll(message, api);
@@ -460,7 +480,8 @@ function handleMessage(message, api) {
         }
         writeCommandLogs({
             "type": "getpoll",
-            "request": pollText,
+            "request": name,
+            "response": pollText,
             "author": message.senderID,
             "thread": message.threadID,
         });
@@ -478,30 +499,59 @@ function handleMessage(message, api) {
     } else if (message.body.startsWith("help")) {
         var help = "tell ... : chatgpt\n" +
         "imagine ... : dall-e\n" +
-        "variation + reply a picture : dall-e variation\n"
-        "poll "
-        api.sendMessage(help, message.threadID);
-    } else if (message.body == "listsaved") {
+        "variation + reply a picture : dall-e variation\n" +
+        "save ... + reply a message : save the message, callable with listmessage and getmessage ...\n" +
+        "poll ...\n...\n... : create a poll with a name and option, callable with listpoll and getpoll ...\n"
+        api.sendMessage(help, message.senderID);
+        writeCommandLogs({
+            "type":"help",
+            "author": message.senderID,
+            "thread": message.threadID,
+        })
+    } else if (message.body == "listmessage") {
         var mes = "";
         storeMessage.forEach(element => {
             mes += element[0] + "\n";
         });
         api.sendMessage(mes, message.threadID);
+        writeCommandLogs({
+            "type":"listmessage",
+            "response":mes,
+            "author": message.senderID,
+            "thread": message.threadID,
+        })
     } else if (message.body.startsWith("getmessage ")) {
         var demand = message.body.substr(message.body.indexOf(" ") + 1);
-        var reply = "";
-        var id = ""
+        var here = "";
+        var reply = ""
         storeMessage.forEach(element => {
             if (element[0] == demand) {
-                reply = ("ici");
-                id = element[1].messageReply.messageID;
+                here = ("ici");
+                reply = element[1].messageReply;
             }
         });
-        if (reply == "") {
+        console.log("message saved : " + reply.body)
+        if (here == "") {
             api.sendMessage("not found", message.threadID);
         } else {
-        api.sendMessage(reply, message.threadID, id);
+            api.sendMessage(here, message.threadID, reply.messageID);
         }
+        writeCommandLogs({
+            "type":"getmessage",
+            "requests":demand,
+            "response":reply.body,
+            "author": message.senderID,
+            "thread": message.threadID,
+        })
+    } else if (message.body == "clearpoll") {
+        console.log("clearpoll");
+        polls = [];
+    } else if (message.body == "clearmessage") {
+        console.log("clearmessage");
+        storeMessage = [];
+    } else if (message.body == "backup") {
+        console.log("backuping");
+        backup()
     } else {
         api.sendMessage(message.body, message.threadID);
         console.log(
@@ -571,31 +621,60 @@ function handleReply(message, api) {
             storeMessage.shift;
         }
         console.log("message saved");
+        api.sendMessage("Message saved", message.threadID);
+        writeCommandLogs({
+            "type":"save",
+            "requests":message.messageReply.messageID,
+            "author": message.senderID,
+            "thread": message.threadID,
+        })
     }
 }
 
-function quit() {
-    fs.readFile(pollsName, "utf8", function readFileCallback(err, data) {
-        // on arrive ici mais le fichier fini vide quoi qu'on fasse, intéressant
+function backup() {
+    fs.readFile(stateName, "utf8", function readFileCallback(err, data) {
+        // on arrive pas ici
         if (err) {
             console.log(err);
         } else {
             obj = JSON.parse(data); //now it an object
             obj.poll = polls.map((poll) => poll.serialize());
             obj.saved = storeMessage;
-            fs.writeFileSync(pollsName, JSON.stringify(obj), (e) => {
+            obj.reminders = reminders;
+            fs.writeFileSync(stateName, JSON.stringify(obj), (e) => {
                 if (e) {
                     throw e;
                 }
                 console.log("Polls saved");
             }); // write it back
         }
-        exit(-1);
+        return;
     });
 }
 
-function init() {
-    fs.readFile(pollsName, "utf8", function readFileCallback(err, data) {
+function quit() {
+    fs.readFile(stateName, "utf8", function readFileCallback(err, data) {
+        // on arrive pas ici
+        if (err) {
+            console.log(err);
+        } else {
+            obj = JSON.parse(data); //now it an object
+            obj.poll = polls.map((poll) => poll.serialize());
+            obj.saved = storeMessage;
+            obj.reminders = reminders;
+            fs.writeFileSync(stateName, JSON.stringify(obj), (e) => {
+                if (e) {
+                    throw e;
+                }
+                console.log("Polls saved");
+            }); // write it back
+        }
+        exit(0);
+    });
+}
+
+function init(api) {
+    fs.readFile(stateName, "utf8", function readFileCallback(err, data) {
         if (err) {
             console.log(err);
             exit(-1);
@@ -606,13 +685,15 @@ function init() {
             polls.push(deserialize(poll));
         });
         storeMessage = obj.saved;
+        obj.reminders.forEach(remind => {
+            reminder(remind, api);
+        });
     });
 }
 
-init();
-
 login(credential, (err, api) => {
     if (err) return console.error(err);
+    init();
     api.setOptions({ listenEvents: true });
     api.listenMqtt((err, message) => {
         if (err) return console.log(err);
@@ -621,6 +702,8 @@ login(credential, (err, api) => {
         if (message.type == "message_reply") handleReply(message, api);
     });
 });
+
+// on arrive ici, le login est aynchrone
 
 // todo : stay in node when execute file for noah-bot
 
@@ -634,5 +717,5 @@ login(credential, (err, api) => {
 // sentback du sendmessage ne marche pas, faut aller toucher à l'api
 // store saved message in case of quit, faut serialize tout ça je crois
 
-// idée reminder : check tout les reminders à la réception d'un message particulier
-// autre bot qui envoie des messages réguliers
+// backup marche pas
+// list remind marche pas
