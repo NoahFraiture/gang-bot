@@ -12,7 +12,7 @@ const credential = {
     appState: JSON.parse(fs.readFileSync("appState.json", "utf-8")),
 };
 
-const configFile = JSON.parse(fs.readFileSync("config.json", "utf-8"));
+const configFile = JSON.parse(fs.readFileSync("config.json", "utf-8"))[0];
 const quality = configFile.quality
 const tokens = configFile.tokens
 const LIMIT_POLLS = configFile.polls_max;
@@ -169,7 +169,7 @@ function createPoll(message, api) {
 }
 
 // return list of poll's name
-function pollList(threadID) {
+function pollList() {
     var mes = "";
     for (let i = 0; i < polls.length; i++) {
         //if (polls[i].thread == threadID) {
@@ -180,11 +180,11 @@ function pollList(threadID) {
 }
 
 function listpoll(message, api) {
-    var mes = pollList(message.threadID);
+    var mes = pollList();
     if (mes == "") {
         console.log("No poll found");
     } else {
-        api.sendMessage(pollList(), message.threadID);
+        api.sendMessage(mes, message.threadID);
         console.log("Polls list printed");
     }
     writeCommandLogs({
@@ -262,7 +262,7 @@ async function createImage(demand) {
 async function createEdit(demand, filename) {
     try {
         console.log(filename);
-        return await openai.createImageEdit( // error but why mmmmmmmmh
+        return await openai.createImageEdit( // todo : handle size but anyway it doesn't really edit cause of the mask
             fs.createReadStream(filename),
             fs.createReadStream("mask.png"),
             demand,
@@ -270,7 +270,7 @@ async function createEdit(demand, filename) {
             quality
         );
     } catch (e) {
-        console.log(e);
+        console.log("here");
         return 0;
     }
 }
@@ -363,8 +363,8 @@ async function edit(message, api) {
     var url_input = message.messageReply.attachments[0].previewUrl;
     try {
         // save input image in "variation.png"
-        await got.stream(url_input).pipe(fs.createWriteStream("variation.png")).on("finish", async()=>{
-            const response = await createEdit(demand, "variation.png");
+        await got.stream(url_input).pipe(fs.createWriteStream("input.png")).on("finish", async()=>{
+            const response = await createEdit(demand, "input.png");
             var url_output = response.data.data[0].url;
             console.log(url_output);
 
@@ -457,10 +457,11 @@ function handleMessage(message, api) {
         console.log("Creating reminder");
         reminder(message, api);
         console.log("Reminder created");
+        api.sendMessage("Reminder created", message.threadID);
     } else if (message.body == "listremind") {
         var mes = ""
         reminders.forEach(element => {
-            mes += (element.body.substr(message.body.indexOf(" ") + 1));
+            mes += element.body.substr(element.body.indexOf(" ") + 1) + "\n";
         });
         api.sendMessage(mes, message.threadID);
         console.log("list of reminders printed");
@@ -509,11 +510,17 @@ function handleMessage(message, api) {
             "thread": message.threadID,
         })
     } else if (message.body == "listmessage") {
+        console.log("Getting saved message")
         var mes = "";
         storeMessage.forEach(element => {
             mes += element[0] + "\n";
         });
-        api.sendMessage(mes, message.threadID);
+        if (mes == "") {
+            api.sendMessage("Nothing found", message.threadID)
+        } else {
+            api.sendMessage(mes, message.threadID);
+        }
+        console.log("saved message : "+mes);
         writeCommandLogs({
             "type":"listmessage",
             "response":mes,
@@ -546,9 +553,11 @@ function handleMessage(message, api) {
     } else if (message.body == "clearpoll") {
         console.log("clearpoll");
         polls = [];
+        api.sendMessage("cleared", message.threadID);
     } else if (message.body == "clearmessage") {
         console.log("clearmessage");
         storeMessage = [];
+        api.sendMessage("cleared", message.threadID);
     } else if (message.body == "backup") {
         console.log("backuping");
         backup()
