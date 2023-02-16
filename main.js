@@ -19,6 +19,7 @@ const LIMIT_POLLS = configFile.polls_max;
 const LIMIT_MESSAGE_STORED = configFile.store_max;
 const emojis = configFile.emojis;
 const key = configFile.key;
+const logsOn = configFile.logsOn;
 
 const { Configuration, OpenAIApi } = require("openai");
 const configuration = new Configuration({
@@ -448,14 +449,15 @@ function handleMessage(message, api) {
         JSON.stringify(message.body),
         message.threadID
     );
-    writeMessageLogs({
-        "type":"message",
-        "content":message.body,
-        "author":message.senderID,
-        "id":message.messageID,
-        "threadID":message.threadID
-    });
-
+    if (logsOn) {
+        writeMessageLogs({
+            "type":"message",
+            "content":message.body,
+            "author":message.senderID,
+            "id":message.messageID,
+            "threadID":message.threadID
+        });
+    }
     if (message.body == "exit") {
         console.log("Exit with message procedure");
         quit();
@@ -584,13 +586,15 @@ function handleReaction(message_reaction) {
         message_reaction.userID,
         message_reaction.reaction
     );
-    writeMessageLogs({
-        "type":"reaction",
-        "content":message_reaction.reaction,
-        "author":message_reaction.senderID,
-        "id":message_reaction.messageID,
-        "threadID":message_reaction.threadID,
-    })
+    if (logsOn) {
+        writeMessageLogs({
+            "type":"reaction",
+            "content":message_reaction.reaction,
+            "author":message_reaction.senderID,
+            "id":message_reaction.messageID,
+            "threadID":message_reaction.threadID,
+        })
+    }
     for (let i = 0; i < polls.length; i++) {
         if (polls[i].messageID == message_reaction.messageID) {
             polls[i].add(message_reaction.reaction, message_reaction.userID);
@@ -606,14 +610,16 @@ function handleReply(message, api) {
         message.threadID,
         JSON.stringify(message.messageReply.body)
     );
-    writeMessageLogs({
-        "type":"reply",
-        "content":message.body,
-        "author":message.senderID,
-        "id":message.messageID,
-        "threadID":message.threadID,
-        "reply":message.messageReply.messageID
-    })
+    if (logsOn) {
+        writeMessageLogs({
+            "type":"reply",
+            "content":message.body,
+            "author":message.senderID,
+            "id":message.messageID,
+            "threadID":message.threadID,
+            "reply":message.messageReply.messageID
+        });
+    }
     if (message.body == "variation") {
         console.log("Generation variation");
         variation(message, api);
