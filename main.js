@@ -743,4 +743,3 @@ while (backupOn) {
 // sentback du sendmessage ne marche pas, faut aller toucher à l'api. On a pas le threadID mais je peux rien y faire on dirait
 // c'est pour différencier les threads et avoir des instances de données différentes, on verra bien
 
-// reminder ping la personne + parser peut être
