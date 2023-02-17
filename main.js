@@ -523,7 +523,7 @@ function handleMessage(message, api) {
         console.log("Getting saved message")
         var mes = "";
         storeMessage.forEach(element => {
-            mes += element[0] + "\n";
+            mes += "\n" + element[0];
         });
         if (mes == "") {
             api.sendMessage("Nothing found", message.threadID)
@@ -655,6 +655,13 @@ function handleReply(message, api) {
 }
 
 // save reminders, polls and saved message in state.json
+function backupLoop(timeout) {
+    setTimeout(() => {
+        backup();
+        backupLoop(timeout);
+    }, timeout);
+}
+
 function backup() {
     fs.readFile(stateName, "utf8", function readFileCallback(err, data) {
         // on arrive pas ici
@@ -672,6 +679,13 @@ function backup() {
                 console.log("Polls saved");
             }); // write it back
         }
+        writeCommandLogs({
+            "command":"backup",
+            "polls":polls,
+            "storemessage":storeMessage,
+            "reminders":reminders
+        });
+        console.log("backuping")
         return;
     });
 }
@@ -728,13 +742,12 @@ login(credential, (err, api) => {
         if (message.type == "message_reaction") handleReaction(message);
         if (message.type == "message_reply") handleReply(message, api);
     });
+    if (backupOn) {
+        backupLoop(1000*60) // every minute, backup
+    }
 });
 
-while (backupOn) {
-    setTimeout(() => {
-        backup();
-    }, 1000*60*60);
-}
+
 
 // todo : quote me
 
