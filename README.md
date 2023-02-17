@@ -21,4 +21,4 @@ You'll also have to add you personnal openai key in the config file. You have an
 ```tell``` : gpt can answer to you  
 ```imagine``` : dall-e can create what you want  
 
-backup will regularly save your polls, saved message and reminder in case of crash. A log file also save every command. There's an option in the config file to save every message. False by default, privacy is important.
+backup will regularly save your polls, saved message and reminder in case of crash. A log file also save every command (openai logs save the api key by default, be carefull and don't share the logs. There's an option in the config file to save every message. False by default, privacy is important.
