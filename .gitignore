@@ -7,5 +7,5 @@ mask.png
 logs.json
 state.json
 quote-it/
-./logs/logs1.jon
-./logs/logsTemplate.jon
+./logs/logs1.json
+./logs/logsTemplate.json
