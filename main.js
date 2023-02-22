@@ -21,7 +21,6 @@ const emojis = configFile.emojis;
 const key = configFile.key;
 const logsOn = configFile.logsOn;
 const backupOn = configFile.backupOn;
-const MAX_TRY = 5;
 
 const { Configuration, OpenAIApi } = require("openai");
 const configuration = new Configuration({
