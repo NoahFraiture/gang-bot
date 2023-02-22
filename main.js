@@ -185,7 +185,7 @@ function pollList(threadID) {
 }
 
 function listpoll(message, api) {
-    var mes = pollList(threadID);
+    var mes = pollList(message.threadID);
     if (mes == "") {
         console.log("No poll found");
     } else {
@@ -461,7 +461,7 @@ function handleMessage(message, api) {
             "threadID":message.threadID
         }, "message");
     }
-    var command = substr(message.body.indexOf(" ") + 1).toLowerCase();
+    var command = message.body.split(" ")[0].toLowerCase();
     if (command == "!exit") {
         console.log("Exit with message procedure");
         quit();
@@ -627,7 +627,7 @@ function handleReply(message, api) {
             "reply":message.messageReply.messageID
         }, "message");
     }
-    var command = substr(message.body.indexOf(" ") + 1).toLowerCase();
+    var command = message.body.split(" ")[0].toLowerCase();
     if (command == "variation") {
         console.log("Generation variation");
         variation(message, api);
