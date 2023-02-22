@@ -461,7 +461,7 @@ function handleMessage(message, api) {
             "threadID":message.threadID
         }, "message");
     }
-    command = substr(message.body.indexOf(" ") + 1).toLowerCase();
+    var command = substr(message.body.indexOf(" ") + 1).toLowerCase();
     if (command == "!exit") {
         console.log("Exit with message procedure");
         quit();
@@ -480,7 +480,7 @@ function handleMessage(message, api) {
     } else if (command == "poll") {
         console.log("Creating poll");
         createPoll(message, api);
-    } else if (command == "getpoll ") {
+    } else if (command == "getpoll") {
         console.log("Searching poll");
         var name = message.body.slice("getpoll".length + 1);
         var myPoll = searchPoll(name.trim(), message.threadID);
@@ -542,7 +542,7 @@ function handleMessage(message, api) {
             "author": message.senderID,
             "thread": message.threadID,
         }, "command")
-    } else if (command == "getmessage ") {
+    } else if (command == "getmessage") {
         var demand = message.body.substr(message.body.indexOf(" ") + 1).trim();
         var here = "";
         var reply = ""
@@ -627,14 +627,15 @@ function handleReply(message, api) {
             "reply":message.messageReply.messageID
         }, "message");
     }
-    if (message.body == "variation") {
+    var command = substr(message.body.indexOf(" ") + 1).toLowerCase();
+    if (command == "variation") {
         console.log("Generation variation");
         variation(message, api);
-    } else if (message.body.startsWith("edit ")) {
+    } else if (command == "edit") {
         return;
         console.log("Editing image");
         edit(message, api);
-    } else if (message.body.startsWith("save ")) {
+    } else if (command == "save") {
         var name = message.body.substr(message.body.indexOf(" ") + 1);
         var out = 0;
         storeMessage.forEach(element => {
@@ -657,9 +658,9 @@ function handleReply(message, api) {
             "author": message.senderID,
             "thread": message.threadID,
         }, "command")
-    } else if (message.body.startsWith("tell")) {
-        console.log("Requesting GPT3");
-        tell(message, api); // asynchronous so need to handle everything in the function
+    } else {
+        console.log("Transposing reply to handle_message");
+        handleMessage(message, api);
     }
 }
 
