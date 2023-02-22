@@ -8,7 +8,7 @@ I'm using the unofficial Facebook API, which can be found at https://github.com/
 
 # Install
 
-You can install facebook-chat-api, openai with npm.
+You can install facebook-chat-api, openai with npm. You may need the version 11 of 'got' rather than version 12.
 
 To use this bot, You will need to create an appState.json file that will correspond to your cache on facebook when you are logged-in with your bot account. You can obtain this file by logging in to facebook with your bot account and using a chrome/firefox extension. Once you have obtained the appState.json file, you will need to rename the "names" key to "key". I'll try to simplify this later but it requires to modify the API. 
 You'll also have to add you personnal openai key in the config file. You have an example. After adding your key you can rename the file "config.json".
