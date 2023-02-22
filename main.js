@@ -115,9 +115,9 @@ function deserialize(dict) {
 }
 
 // return message representing the poll named. 0 otherwised
-function searchPoll(name) {
+function searchPoll(name, threadID) {
     for (let i = 0; i < polls.length; i++) {
-        if (polls[i].name == name) {
+        if (polls[i].thread == threadID && polls[i].name == name) {
             return polls[i];
         }
     }
@@ -136,7 +136,7 @@ function createPollInfos(content) {
 function createPoll(message, api) {
     // create message of poll
     var pollMessage = createPollInfos(message.body); // name-str ; options-list(str)
-    if (searchPoll(pollMessage[0].trim()) != 0) {
+    if (searchPoll(pollMessage[0].trim(), message.threadID) != 0) {
         api.sendMessage(
             "A poll with this name already exists",
             message.threadID
@@ -160,7 +160,7 @@ function createPoll(message, api) {
                 sentMessageInfo.messageID,
                 pollMessage[0].trim(),
                 pollMessage[1],
-                sentMessageInfo.threadID // todo : empty but why ?
+                message.threadID
             )
         );
         console.log('Poll created "%s"', pollMessage[0]);
@@ -174,18 +174,18 @@ function createPoll(message, api) {
 }
 
 // return list of poll's name
-function pollList() {
+function pollList(threadID) {
     var mes = "";
     for (let i = 0; i < polls.length; i++) {
-        //if (polls[i].thread == threadID) {
+        if (polls[i].thread == threadID) {
         mes = mes + polls[i].name + "\n";
-        //}
+        }
     }
     return mes;
 }
 
 function listpoll(message, api) {
-    var mes = pollList();
+    var mes = pollList(threadID);
     if (mes == "") {
         console.log("No poll found");
     } else {
@@ -461,30 +461,29 @@ function handleMessage(message, api) {
             "threadID":message.threadID
         }, "message");
     }
-    //if (message.senderID == 100005472187969) {return;}
-    message.body = message.body.toLowerCase();
-    if (message.body == "!exit") {
+    command = substr(message.body.indexOf(" ") + 1).toLowerCase();
+    if (command == "!exit") {
         console.log("Exit with message procedure");
         quit();
-    } else if (message.body.startsWith("remindme")) {
+    } else if (command == "remindme") {
         console.log("Creating reminder");
         reminder(message, api);
         console.log("Reminder created");
         api.sendMessage("Reminder created", message.threadID);
-    } else if (message.body == "listremind") {
+    } else if (command == "listremind") {
         var mes = ""
         reminders.forEach(element => {
             mes += element.body.substr(element.body.indexOf(" ") + 1) + "\n";
         });
         api.sendMessage(mes, message.threadID);
         console.log("list of reminders printed");
-    } else if (message.body.startsWith("poll")) {
+    } else if (command == "poll") {
         console.log("Creating poll");
         createPoll(message, api);
-    } else if (message.body.startsWith("getpoll ")) {
+    } else if (command == "getpoll ") {
         console.log("Searching poll");
         var name = message.body.slice("getpoll".length + 1);
-        var myPoll = searchPoll(name.trim());
+        var myPoll = searchPoll(name.trim(), message.threadID);
         var pollText = myPoll.print();
         if (pollText) {
             api.sendMessage(pollText, message.threadID, myPoll.messageID);
@@ -499,18 +498,18 @@ function handleMessage(message, api) {
             "author": message.senderID,
             "thread": message.threadID,
         }, "command");
-    } else if (message.body.startsWith("listpoll")) {
+    } else if (command == "listpoll") {
         listpoll(message, api);
-    } else if (message.body.startsWith("tell")) {
+    } else if (command == "tell") {
         console.log("Requesting GPT3");
         tell(message, api); // asynchronous so need to handle everything in the function
-    } else if (message.body.startsWith("imagine")) {
+    } else if (command == "imagine") {
         console.log("Generating image");
         imagine(message, api);
-    } else if (message.body == "!ping") {
+    } else if (command == "!ping") {
         api.sendMessage("pong", message.threadID);
         console.log("Ping Pong operation !");
-    } else if (message.body.startsWith("!help")) {
+    } else if (command == "!help") {
         var help = "tell ... : chatgpt\n" +
         "imagine ... : dall-e\n" +
         "variation + reply a picture : dall-e variation\n" +
@@ -523,11 +522,13 @@ function handleMessage(message, api) {
             "author": message.senderID,
             "thread": message.threadID,
         }, "command")
-    } else if (message.body == "listmessage") {
+    } else if (command == "listmessage") {
         console.log("Getting saved message")
         var mes = "";
         storeMessage.forEach(element => {
-            mes += "\n" + element[0];
+            if (element[2] == message.threadID) {
+                mes += "\n" + element[0];
+            }
         });
         if (mes == "") {
             api.sendMessage("Nothing found", message.threadID)
@@ -541,13 +542,13 @@ function handleMessage(message, api) {
             "author": message.senderID,
             "thread": message.threadID,
         }, "command")
-    } else if (message.body.startsWith("getmessage ")) {
+    } else if (command == "getmessage ") {
         var demand = message.body.substr(message.body.indexOf(" ") + 1).trim();
         var here = "";
         var reply = ""
         console.log(demand);
         storeMessage.forEach(element => {
-            if (element[0].toLowerCase() == demand) {
+            if (element[2] == message.threadID && element[0] == demand) {
                 here = ("ici");
                 reply = element[1].messageReply;
             }
@@ -565,15 +566,15 @@ function handleMessage(message, api) {
             "author": message.senderID,
             "thread": message.threadID,
         }, "command")
-    } else if (message.body == "clearpoll") {
+    } else if (command == "clearpoll") {
         console.log("clearpoll");
         polls = [];
         api.sendMessage("cleared", message.threadID);
-    } else if (message.body == "clearmessage") {
+    } else if (command == "clearmessage") {
         console.log("clearmessage");
         storeMessage = [];
         api.sendMessage("cleared", message.threadID);
-    } else if (message.body == "backup") {
+    } else if (command == "backup") {
         console.log("backuping");
         backup()
     } else {
@@ -637,14 +638,14 @@ function handleReply(message, api) {
         var name = message.body.substr(message.body.indexOf(" ") + 1);
         var out = 0;
         storeMessage.forEach(element => {
-            if (element[0] == name) {
+            if (element[2] == message.threadID && element[0] == name) {
                 api.sendMessage("Already a message saved with this", message.threadID);
                 out = 1;
                 return;
             }
         });
         if (out == 1) return;
-        storeMessage.push([name, message]);
+        storeMessage.push([name, message, message.threadID]);
         if (storeMessage.length > LIMIT_MESSAGE_STORED) {
             storeMessage.shift;
         }
