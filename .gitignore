@@ -7,5 +7,4 @@ mask.png
 state.json
 quote-it/
 logs/
-history.js
-history.json
+history/
