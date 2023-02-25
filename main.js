@@ -336,11 +336,14 @@ async function variation(message, api) {
     if (url_input == undefined) {
         url_input = message.messageReply.attachments[0].sticker_attachment.url
     }
+    console.log(url_input)
     try {
         // save input image in "variation.png"
         await got.stream(url_input).pipe(fs.createWriteStream("variation.png")).on("finish", async()=>{
             const response = await createVariation("variation.png"); // ça a l'air tellement à chier
+            console.log(response)
             var url_output = response.data.data[0].url;
+            console.log(url_output)
 
             writeLogs({
                 "type": "variation",
