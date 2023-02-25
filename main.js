@@ -339,7 +339,7 @@ async function variation(message, api) {
         // save input image in "variation.png"
         console.log(url_input)
         await got.stream(url_input).pipe(fs.createWriteStream("variation.png")).on("finish", async()=>{
-            const response = await createVariation("variation.png");
+            const response = await createVariation("variation.png"); 
             var url_output = response.data.data[0].url;
 
             writeLogs({
