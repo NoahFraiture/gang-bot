@@ -616,7 +616,7 @@ function handleReply(message, api) {
         message.threadID,
         JSON.stringify(message.messageReply.body)
     );
-    if (logsOn) {
+    if (0) {
         writeLogs({
             "type":"reply",
             "content":message.body,
@@ -627,6 +627,7 @@ function handleReply(message, api) {
         }, "message");
     }
     var command = message.body.split(" ")[0].toLowerCase();
+    console.log("--------------------")
     console.log(message.messageReply)
     if (command == "variation") {
         console.log("Generation variation");
