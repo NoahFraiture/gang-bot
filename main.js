@@ -332,10 +332,10 @@ async function imagine(message, api) {
 
 async function variation(message, api) {
     const demand = message.messageReply.body.substr(message.body.indexOf(" ") + 1);
-    console.log(message.messageReply) 
     var url_input = message.messageReply.attachments[0].previewUrl;
-    console.log(url_input)
-    console.log(message.messageReply.attachments[0].sticker_attachment)
+    if (url_input == undefined) {
+        url_input = message.messageReply.attachments[0].sticker_attachment.url
+    }
     try {
         // save input image in "variation.png"
         await got.stream(url_input).pipe(fs.createWriteStream("variation.png")).on("finish", async()=>{
