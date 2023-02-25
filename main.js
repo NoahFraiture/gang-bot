@@ -660,7 +660,7 @@ function handleReply(message, api) {
         }, "command")
     } else {
         console.log("Transposing reply to handle_message");
-        handleMessage(message, api);
+        //handleMessage(message, api);
     }
 }
 
