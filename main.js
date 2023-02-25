@@ -332,7 +332,7 @@ async function imagine(message, api) {
 
 async function variation(message, api) {
     const demand = message.messageReply.body.substr(message.body.indexOf(" ") + 1);
-    console.log(message.messageReply)
+    console.log(message.messageReply) 
     var url_input = message.messageReply.attachments[0].previewUrl;
     try {
         // save input image in "variation.png"
