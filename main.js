@@ -334,6 +334,8 @@ async function variation(message, api) {
     const demand = message.messageReply.body.substr(message.body.indexOf(" ") + 1);
     console.log(message.messageReply) 
     var url_input = message.messageReply.attachments[0].previewUrl;
+    console.log(url_input)
+    console.log(message.messageReply.attachments[0].sticker_attachment)
     try {
         // save input image in "variation.png"
         await got.stream(url_input).pipe(fs.createWriteStream("variation.png")).on("finish", async()=>{
@@ -630,8 +632,6 @@ function handleReply(message, api) {
         }, "message");
     }
     var command = message.body.split(" ")[0].toLowerCase();
-    console.log("--------------------")
-    console.log(message.messageReply)
     if (command == "variation") {
         console.log("Generation variation");
         variation(message, api);
