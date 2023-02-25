@@ -294,6 +294,7 @@ async function createVariation(filename) {
         );
     } catch (e) {
         console.log(e);
+        console.log("error in creation of variation")
         return 0;
     }
 }
