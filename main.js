@@ -294,7 +294,6 @@ async function createVariation(filename) {
         );
     } catch (e) {
         console.log(e);
-        console.log("here !")
         return 0;
     }
 }
@@ -340,10 +339,9 @@ async function variation(message, api) {
     try {
         // save input image in "variation.png"
         await got.stream(url_input).pipe(fs.createWriteStream("variation.png")).on("finish", async()=>{
-            const response = await createVariation("variation.png"); // ça a l'air tellement à chier
-            console.log(response)
+            const response = await createVariation("variation.png");
             var url_output = response.data.data[0].url;
-            console.log(url_output)  
+            console.log(url_output)
 
             writeLogs({
                 "type": "variation",
