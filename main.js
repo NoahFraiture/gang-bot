@@ -332,6 +332,7 @@ async function imagine(message, api) {
 async function variation(message, api) {
     const demand = message.messageReply.body.substr(message.body.indexOf(" ") + 1);
     var url_input = message.messageReply.attachments[0].previewUrl;
+    console.log(url_input)
     if (url_input == undefined) {
         url_input = message.messageReply.attachments[0].sticker_attachment.url
     }
