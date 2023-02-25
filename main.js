@@ -627,6 +627,7 @@ function handleReply(message, api) {
         }, "message");
     }
     var command = message.body.split(" ")[0].toLowerCase();
+    console.log(message.messageReply)
     if (command == "variation") {
         console.log("Generation variation");
         variation(message, api);
