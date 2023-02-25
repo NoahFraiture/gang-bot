@@ -332,6 +332,7 @@ async function imagine(message, api) {
 
 async function variation(message, api) {
     const demand = message.messageReply.body.substr(message.body.indexOf(" ") + 1);
+    console.log(message.messageReply)
     var url_input = message.messageReply.attachments[0].previewUrl;
     try {
         // save input image in "variation.png"
@@ -415,6 +416,8 @@ function writeLogs(content, category) {
                     obj.message.push(content); //add some data
                 } else if (category == "command") {
                     obj.command.push(content);
+                } else if (category == "error") {
+                    obj.error.push(content);
                 } else {
                     console.log("Error in category of writing logs");
                     return;
@@ -749,8 +752,11 @@ login(credential, (err, api) => {
     api.setOptions({ listenEvents: true });
     api.listenMqtt((err, message) => {
         if (err) {
-            console.log("--------")
-            console.log(err);
+            writeLogs({
+                "type":"error",
+                "content":err
+            }, "error");
+            console.log("Error in message : probably a sticker")
             return;
         }
         if (message.type == "message") handleMessage(message, api);
