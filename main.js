@@ -331,13 +331,13 @@ async function imagine(message, api) {
 
 async function variation(message, api) {
     const demand = message.messageReply.body.substr(message.body.indexOf(" ") + 1);
-    console.log(message.messageReply.attachments[0])
     var url_input = message.messageReply.attachments[0].previewUrl;
     if (url_input == undefined) {
         url_input = message.messageReply.attachments[0].sticker_attachment.url
     }
     try {
         // save input image in "variation.png"
+        console.log(url_input)
         await got.stream(url_input).pipe(fs.createWriteStream("variation.png")).on("finish", async()=>{
             const response = await createVariation("variation.png");
             var url_output = response.data.data[0].url;
