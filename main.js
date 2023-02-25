@@ -343,7 +343,7 @@ async function variation(message, api) {
             const response = await createVariation("variation.png"); // ça a l'air tellement à chier
             console.log(response)
             var url_output = response.data.data[0].url;
-            console.log(url_output)
+            console.log(url_output) 
 
             writeLogs({
                 "type": "variation",
