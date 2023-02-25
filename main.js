@@ -616,7 +616,7 @@ function handleReply(message, api) {
         message.threadID,
         JSON.stringify(message.messageReply.body)
     );
-    if (0) {
+    if (logsOn) {
         writeLogs({
             "type":"reply",
             "content":message.body,
@@ -748,7 +748,11 @@ login(credential, (err, api) => {
     init();
     api.setOptions({ listenEvents: true });
     api.listenMqtt((err, message) => {
-        if (err) return console.log(err);
+        if (err) {
+            console.log("--------")
+            console.log(err);
+            return;
+        }
         if (message.type == "message") handleMessage(message, api);
         if (message.type == "message_reaction") handleReaction(message);
         if (message.type == "message_reply") handleReply(message, api);
