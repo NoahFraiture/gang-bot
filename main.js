@@ -338,7 +338,6 @@ async function variation(message, api) {
     }
     try {
         // save input image in "variation.png"
-        console.log(url_input)
         await got.stream(url_input).pipe(fs.createWriteStream("variation.png")).on("finish", async()=>{
             const response = await createVariation("variation.png"); // error in that
             var url_output = response.data.data[0].url;
@@ -765,7 +764,7 @@ login(credential, (err, api) => {
         if (message.type == "message_reply") handleReply(message, api);
     });
     if (backupOn) {
-        backupLoop(1000*60*60) // every minute, backup
+        backupLoop(1000*60*60*24) // every day, backup
     }
 });
 
